@@ -43,7 +43,6 @@ extends:
     deployToSecondary: ${{ parameters.deployToSecondary }}
     appName: $(APIName)
     appProject: PTS
-    sqlProject: TRS
     scr: GH
     appType: 'functionApp'
     appInstanceNumber: $(nc-region-id)08
@@ -51,7 +50,7 @@ extends:
       **/*Functions.csproj
       **/*Tests.csproj
     publishProject: '**/*Functions.csproj'
-    setupMiUser: 'true'    
+    setupMiUser: 'false'    
     skipBuildTests: false
     runIntegrationTests: false
     runSonarScan: false
