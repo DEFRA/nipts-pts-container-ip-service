@@ -1,8 +1,8 @@
-name: 'V1-B$(Date:yyyyMMdd)-$(BuildID)'
+name: "V1-B$(Date:yyyyMMdd)-$(BuildID)"
 
 parameters:
   - name: forceDevDeploy
-    displayName: "Deploy to DEV?"
+    displayName: "Force deployment to DEV"
     type: boolean
     default: false
   - name: deployToSecondary
@@ -36,50 +36,50 @@ resources:
 variables:
   APIName: Defra.PTS.ContainerIpService.Functions
 
-  # Default environment values (PRD)
-  AzureWebJobsStorage: "UseDevelopmentStorage=true"
-  FUNCTIONS_WORKER_RUNTIME: "dotnet"
-  keyVaultName: "PRDTRDINFKV1001"
-  AzureTenantId: "c9d74090-b4e6-4b04-981d-e6757a160812"
-  ContainerName: "prd-pts-trade-chromium"
-  ContainerResourceGroupName: "PRDPTSINFRG1001"
-  Subscription: "d6f720f6-0e75-44c9-a406-2840c33ec61e"
-
-stages:
-  - stage: Deploy
-    jobs:
-      - job: SetVariables
-        displayName: 'Set Environment Variables'
-        steps:
-          - script: echo "Setting environment variables based on deployment environment"
-            displayName: 'Set Environment Variables'
-            env:
-              AzureWebJobsStorage: ${{ parameters.deployToSecondary == 'DEV' && 'UseDevelopmentStorage=true' || 'UseProductionStorage=true' }}
-              FUNCTIONS_WORKER_RUNTIME: "dotnet"
-              keyVaultName: ${{ parameters.deployToSecondary == 'DEV' && 'DEVTRDINFKV1001' || parameters.deployToSecondary == 'TST' && 'TSTTRDINFKV1001' || parameters.deployToSecondary == 'PRE' && 'PRETRDINFKV1001' || 'PRDTRDINFKV1001' }}
-              AzureTenantId: "c9d74090-b4e6-4b04-981d-e6757a160812"
-              ContainerName: ${{ parameters.deployToSecondary == 'DEV' && 'dev-pts-trade-chromium' || parameters.deployToSecondary == 'TST' && 'tst-pts-trade-chromium' || parameters.deployToSecondary == 'PRE' && 'pre-pts-trade-chromium' || 'prd-pts-trade-chromium' }}
-              ContainerResourceGroupName: ${{ parameters.deployToSecondary == 'DEV' && 'DEVPTSINFRG1001' || parameters.deployToSecondary == 'TST' && 'TSTPTSINFRG1001' || parameters.deployToSecondary == 'PRE' && 'PREPTSINFRG1001' || 'PRDPTSINFRG1001' }}
-              Subscription: "d6f720f6-0e75-44c9-a406-2840c33ec61e"
-
-      - job: DeployToApp
-        displayName: 'Deploy Application'
-        dependsOn: SetVariables
-        steps:
-          - template: /templates/basic-webapp-deploy-pipeline.yaml@PipelineCommon
-            parameters:
-              forceDevDeploy: ${{ parameters.forceDevDeploy }}
-              deployToSecondary: ${{ parameters.deployToSecondary }}
-              appName: $(APIName)
-              appProject: PTS
-              sqlProject: TRS
-              appType: 'functionApp'
-              appInstanceNumber: $(nc-region-id)04
-              buildProjects: |
-                **/*Functions.csproj
-                **/*Tests.csproj
-              publishProject: '**/*Functions.csproj'
-              setupMiUser: 'true'    
-              skipBuildTests: false
-              runIntegrationTests: false
-              runSonarScan: true
+extends:
+  template: /templates/basic-webapp-deploy-pipeline.yaml@PipelineCommon
+  parameters:
+    forceDevDeploy: ${{ parameters.forceDevDeploy }}
+    deployToSecondary: ${{ parameters.deployToSecondary }}
+    appName: $(APIName)
+    appProject: PTS
+    sqlProject: TRS
+    appType: 'functionApp'
+    appInstanceNumber: $(nc-region-id)08
+    buildProjects: |
+      **/*Functions.csproj
+      **/*Tests.csproj
+    publishProject: '**/*Functions.csproj'
+    setupMiUser: 'true'    
+    skipBuildTests: false
+    runIntegrationTests: false
+    runSonarScan: true
+    appSettingsEnv:
+      dev: >-
+        -AzureWebJobsStorage "UseDevelopmentStorage=true"
+        -keyVaultName "DEVTRDINFKV1001"
+        -AzureTenantId "c9d74090-b4e6-4b04-981d-e6757a160812"
+        -ContainerName "dev-pts-trade-chromium"
+        -ContainerResourceGroupName "DEVPTSINFRG1001"
+        -Subscription "d6f720f6-0e75-44c9-a406-2840c33ec61e"
+      tst: >-
+        -AzureWebJobsStorage "UseDevelopmentStorage=true"
+        -keyVaultName "TSTTRDINFKV1001"
+        -AzureTenantId "c9d74090-b4e6-4b04-981d-e6757a160812"
+        -ContainerName "tst-pts-trade-chromium"
+        -ContainerResourceGroupName "TSTPTSINFRG1001"
+        -Subscription "d6f720f6-0e75-44c9-a406-2840c33ec61e"
+      pre: >-
+        -AzureWebJobsStorage "UseDevelopmentStorage=true"
+        -keyVaultName "PRETRDINFKV1001"
+        -AzureTenantId "c9d74090-b4e6-4b04-981d-e6757a160812"
+        -ContainerName "pre-pts-trade-chromium"
+        -ContainerResourceGroupName "PREPTSINFRG1001"
+        -Subscription "d6f720f6-0e75-44c9-a406-2840c33ec61e"
+      prd: >-
+        -AzureWebJobsStorage "UseDevelopmentStorage=true"
+        -keyVaultName "PRDTRDINFKV1001"
+        -AzureTenantId "c9d74090-b4e6-4b04-981d-e6757a160812"
+        -ContainerName "prd-pts-trade-chromium"
+        -ContainerResourceGroupName "PRDPTSINFRG1001"
+        -Subscription "d6f720f6-0e75-44c9-a406-2840c33ec61e"
