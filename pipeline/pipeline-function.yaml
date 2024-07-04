@@ -44,6 +44,7 @@ extends:
     appName: $(APIName)
     appProject: PTS
     sqlProject: TRS
+    scr: GH
     appType: 'functionApp'
     appInstanceNumber: $(nc-region-id)08
     buildProjects: |
