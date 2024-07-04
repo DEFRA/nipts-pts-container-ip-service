@@ -36,50 +36,45 @@ resources:
 variables:
   APIName: Defra.PTS.ContainerIpService.Functions
 
-extends:
-  template: /templates/basic-webapp-deploy-pipeline.yaml@PipelineCommon
-  parameters:
-    forceDevDeploy: ${{ parameters.forceDevDeploy }}
-    deployToSecondary: ${{ parameters.deployToSecondary }}
-    appName: $(APIName)
-    appProject: PTS
-    scr: GH
-    appType: 'functionApp'
-    appInstanceNumber: $(nc-region-id)08
-    buildProjects: |
-      **/*Functions.csproj
-      **/*Tests.csproj
-    publishProject: '**/*Functions.csproj'
-    setupMiUser: 'false'    
-    skipBuildTests: false
-    runIntegrationTests: false
-    runSonarScan: false
-    appSettingsEnv:
-      dev: >-
-        -AzureWebJobsStorage "UseDevelopmentStorage=true"
-        -keyVaultName "DEVTRDINFKV1001"
-        -AzureTenantId "c9d74090-b4e6-4b04-981d-e6757a160812"
-        -ContainerName "dev-pts-trade-chromium"
-        -ContainerResourceGroupName "DEVPTSINFRG1001"
-        -Subscription "d6f720f6-0e75-44c9-a406-2840c33ec61e"
-      tst: >-
-        -AzureWebJobsStorage "UseDevelopmentStorage=true"
-        -keyVaultName "TSTTRDINFKV1001"
-        -AzureTenantId "c9d74090-b4e6-4b04-981d-e6757a160812"
-        -ContainerName "tst-pts-trade-chromium"
-        -ContainerResourceGroupName "TSTPTSINFRG1001"
-        -Subscription "d6f720f6-0e75-44c9-a406-2840c33ec61e"
-      pre: >-
-        -AzureWebJobsStorage "UseDevelopmentStorage=true"
-        -keyVaultName "PRETRDINFKV1001"
-        -AzureTenantId "c9d74090-b4e6-4b04-981d-e6757a160812"
-        -ContainerName "pre-pts-trade-chromium"
-        -ContainerResourceGroupName "PREPTSINFRG1001"
-        -Subscription "d6f720f6-0e75-44c9-a406-2840c33ec61e"
-      prd: >-
-        -AzureWebJobsStorage "UseDevelopmentStorage=true"
-        -keyVaultName "PRDTRDINFKV1001"
-        -AzureTenantId "c9d74090-b4e6-4b04-981d-e6757a160812"
-        -ContainerName "prd-pts-trade-chromium"
-        -ContainerResourceGroupName "PRDPTSINFRG1001"
-        -Subscription "d6f720f6-0e75-44c9-a406-2840c33ec61e"
+stages:
+  - stage: Deploy
+    jobs:
+      - job: DotNetRestore
+        displayName: 'DotNet Restore'
+        pool:
+          vmImage: 'ubuntu-latest'
+        steps:
+          - task: UseDotNet@2
+            inputs:
+              packageType: 'sdk'
+              version: '6.x.x' # Specify the .NET SDK version you need
+              installationPath: $(Agent.ToolsDirectory)/dotnet
+
+          - task: DotNetCoreCLI@2
+            inputs:
+              command: 'restore'
+              projects: 'src/Defra.PTS.ContainerIpService.Functions/**/*.csproj' # Adjust the search pattern if necessary
+
+      - job: DeployToApp
+        displayName: 'Deploy Application'
+        dependsOn: DotNetRestore
+        pool:
+          vmImage: 'ubuntu-latest'
+        steps:
+          - template: /templates/basic-webapp-deploy-pipeline.yaml@PipelineCommon
+            parameters:
+              forceDevDeploy: ${{ parameters.forceDevDeploy }}
+              deployToSecondary: ${{ parameters.deployToSecondary }}
+              appName: $(APIName)
+              appProject: PTS
+              scr: GH
+              appType: 'functionApp'
+              appInstanceNumber: $(nc-region-id)08
+              buildProjects: |
+                src/Defra.PTS.ContainerIpService.Functions/**/*.csproj
+                test/**/*.csproj
+              publishProject: 'src/Defra.PTS.ContainerIpService.Functions/**/*.csproj'
+              setupMiUser: 'false'    
+              skipBuildTests: false
+              runIntegrationTests: false
+              runSonarScan: false
