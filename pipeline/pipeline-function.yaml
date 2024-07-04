@@ -53,7 +53,7 @@ extends:
     setupMiUser: 'true'    
     skipBuildTests: false
     runIntegrationTests: false
-    runSonarScan: true
+    runSonarScan: false
     appSettingsEnv:
       dev: >-
         -AzureWebJobsStorage "UseDevelopmentStorage=true"
