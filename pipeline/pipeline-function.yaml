@@ -1,0 +1,111 @@
+name: 'V1-B$(Date:yyyyMMdd)-$(BuildID)'
+
+parameters:
+  - name: forceDevDeploy
+    displayName: "Deploy to DEV?"
+    type: boolean
+    default: false
+  - name: deployToSecondary
+    displayName: "Select Secondary Region"
+    type: string
+    default: PRD
+    values:
+      - None
+      - DEV
+      - TST
+      - PRE
+      - PRD
+
+trigger:
+  batch: true
+  branches:
+    include:
+    - '*'
+  paths:
+    include:
+     - src/Defra.PTS.ContainerIpService.Functions/*
+     - test/*
+
+resources:
+  repositories:
+    - repository: PipelineCommon
+      name: DEFRA-TRD/Defra.TRD.Pipeline.Common
+      type: git
+      ref: master
+
+variables:
+  APIName: Defra.PTS.ContainerIpService.Functions
+
+stages:
+  - stage: Deploy
+    jobs:
+      - job: SetVariables
+        displayName: 'Set Environment Variables'
+        steps:
+          - ${{ if eq(parameters.deployToSecondary, 'DEV') }}:
+            - script: echo "Setting DEV environment variables"
+              displayName: 'Set DEV variables'
+              env:
+                AzureWebJobsStorage: "UseDevelopmentStorage=true"
+                keyVaultName: "DEVTRDINFKV1001"
+                AzureTenantId: "c9d74090-b4e6-4b04-981d-e6757a160812"
+                ContainerName: "dev-pts-trade-chromium"
+                ContainerResourceGroupName: "DEVPTSINFRG1001"
+                Subscription: "d6f720f6-0e75-44c9-a406-2840c33ec61e"
+
+          - ${{ if eq(parameters.deployToSecondary, 'TST') }}:
+            - script: echo "Setting TST environment variables"
+              displayName: 'Set TST variables'
+              env:
+                AzureWebJobsStorage: "UseDevelopmentStorage=true"
+                keyVaultName: "TSTTRDINFKV1001"
+                AzureTenantId: "c9d74090-b4e6-4b04-981d-e6757a160812"
+                ContainerName: "tst-pts-trade-chromium"
+                ContainerResourceGroupName: "TSTPTSINFRG1001"
+                Subscription: "d6f720f6-0e75-44c9-a406-2840c33ec61e"
+
+          - ${{ if eq(parameters.deployToSecondary, 'PRE') }}:
+            - script: echo "Setting PRE environment variables"
+              displayName: 'Set PRE variables'
+              env:
+                AzureWebJobsStorage: "UseDevelopmentStorage=true"
+                keyVaultName: "PRETRDINFKV1001"
+                AzureTenantId: "c9d74090-b4e6-4b04-981d-e6757a160812"
+                ContainerName: "pre-pts-trade-chromium"
+                ContainerResourceGroupName: "PREPTSINFRG1001"
+                Subscription: "d6f720f6-0e75-44c9-a406-2840c33ec61e"
+
+          - ${{ if eq(parameters.deployToSecondary, 'PRD') }}:
+            - script: echo "Setting PRD environment variables"
+              displayName: 'Set PRD variables'
+              env:
+                AzureWebJobsStorage: "UseDevelopmentStorage=true"
+                keyVaultName: "PRDTRDINFKV1001"
+                AzureTenantId: "c9d74090-b4e6-4b04-981d-e6757a160812"
+                ContainerName: "prd-pts-trade-chromium"
+                ContainerResourceGroupName: "PRDPTSINFRG1001"
+                Subscription: "d6f720f6-0e75-44c9-a406-2840c33ec61e"
+
+  - stage: DeployApp
+    dependsOn: Deploy
+    jobs:
+      - job: DeployToApp
+        displayName: 'Deploy Application'
+        steps:
+          - template: /templates/basic-webapp-deploy-pipeline.yaml@PipelineCommon
+            parameters:
+              forceDevDeploy: ${{ parameters.forceDevDeploy }}
+              deployToSecondary: ${{ parameters.deployToSecondary }}
+              appName: $(APIName)
+              appProject: PTS
+              sqlProject: TRS
+              appType: 'functionApp'
+              appInstanceNumber: $(nc-region-id)08
+              buildProjects: |
+                **/*Functions.csproj
+                **/*Tests.csproj
+              publishProject: '**/*Functions.csproj'
+              setupMiUser: 'true'    
+              skipBuildTests: false
+              runIntegrationTests: false
+              runSonarScan: true
