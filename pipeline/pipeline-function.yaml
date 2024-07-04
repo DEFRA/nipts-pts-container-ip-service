@@ -36,61 +36,35 @@ resources:
 variables:
   APIName: Defra.PTS.ContainerIpService.Functions
 
+  # Default environment values (PRD)
+  AzureWebJobsStorage: "UseDevelopmentStorage=true"
+  FUNCTIONS_WORKER_RUNTIME: "dotnet"
+  keyVaultName: "PRDTRDINFKV1001"
+  AzureTenantId: "c9d74090-b4e6-4b04-981d-e6757a160812"
+  ContainerName: "prd-pts-trade-chromium"
+  ContainerResourceGroupName: "PRDPTSINFRG1001"
+  Subscription: "d6f720f6-0e75-44c9-a406-2840c33ec61e"
+
 stages:
   - stage: Deploy
     jobs:
       - job: SetVariables
         displayName: 'Set Environment Variables'
         steps:
-          - ${{ if eq(parameters.deployToSecondary, 'DEV') }}:
-            - script: echo "Setting DEV environment variables"
-              displayName: 'Set DEV variables'
-              env:
-                AzureWebJobsStorage: "UseDevelopmentStorage=true"
-                keyVaultName: "DEVTRDINFKV1001"
-                AzureTenantId: "c9d74090-b4e6-4b04-981d-e6757a160812"
-                ContainerName: "dev-pts-trade-chromium"
-                ContainerResourceGroupName: "DEVPTSINFRG1001"
-                Subscription: "d6f720f6-0e75-44c9-a406-2840c33ec61e"
+          - script: echo "Setting environment variables based on deployment environment"
+            displayName: 'Set Environment Variables'
+            env:
+              AzureWebJobsStorage: ${{ parameters.deployToSecondary == 'DEV' && 'UseDevelopmentStorage=true' || 'UseProductionStorage=true' }}
+              FUNCTIONS_WORKER_RUNTIME: "dotnet"
+              keyVaultName: ${{ parameters.deployToSecondary == 'DEV' && 'DEVTRDINFKV1001' || parameters.deployToSecondary == 'TST' && 'TSTTRDINFKV1001' || parameters.deployToSecondary == 'PRE' && 'PRETRDINFKV1001' || 'PRDTRDINFKV1001' }}
+              AzureTenantId: "c9d74090-b4e6-4b04-981d-e6757a160812"
+              ContainerName: ${{ parameters.deployToSecondary == 'DEV' && 'dev-pts-trade-chromium' || parameters.deployToSecondary == 'TST' && 'tst-pts-trade-chromium' || parameters.deployToSecondary == 'PRE' && 'pre-pts-trade-chromium' || 'prd-pts-trade-chromium' }}
+              ContainerResourceGroupName: ${{ parameters.deployToSecondary == 'DEV' && 'DEVPTSINFRG1001' || parameters.deployToSecondary == 'TST' && 'TSTPTSINFRG1001' || parameters.deployToSecondary == 'PRE' && 'PREPTSINFRG1001' || 'PRDPTSINFRG1001' }}
+              Subscription: "d6f720f6-0e75-44c9-a406-2840c33ec61e"
 
-          - ${{ if eq(parameters.deployToSecondary, 'TST') }}:
-            - script: echo "Setting TST environment variables"
-              displayName: 'Set TST variables'
-              env:
-                AzureWebJobsStorage: "UseDevelopmentStorage=true"
-                keyVaultName: "TSTTRDINFKV1001"
-                AzureTenantId: "c9d74090-b4e6-4b04-981d-e6757a160812"
-                ContainerName: "tst-pts-trade-chromium"
-                ContainerResourceGroupName: "TSTPTSINFRG1001"
-                Subscription: "d6f720f6-0e75-44c9-a406-2840c33ec61e"
-
-          - ${{ if eq(parameters.deployToSecondary, 'PRE') }}:
-            - script: echo "Setting PRE environment variables"
-              displayName: 'Set PRE variables'
-              env:
-                AzureWebJobsStorage: "UseDevelopmentStorage=true"
-                keyVaultName: "PRETRDINFKV1001"
-                AzureTenantId: "c9d74090-b4e6-4b04-981d-e6757a160812"
-                ContainerName: "pre-pts-trade-chromium"
-                ContainerResourceGroupName: "PREPTSINFRG1001"
-                Subscription: "d6f720f6-0e75-44c9-a406-2840c33ec61e"
-
-          - ${{ if eq(parameters.deployToSecondary, 'PRD') }}:
-            - script: echo "Setting PRD environment variables"
-              displayName: 'Set PRD variables'
-              env:
-                AzureWebJobsStorage: "UseDevelopmentStorage=true"
-                keyVaultName: "PRDTRDINFKV1001"
-                AzureTenantId: "c9d74090-b4e6-4b04-981d-e6757a160812"
-                ContainerName: "prd-pts-trade-chromium"
-                ContainerResourceGroupName: "PRDPTSINFRG1001"
-                Subscription: "d6f720f6-0e75-44c9-a406-2840c33ec61e"
-
-  - stage: DeployApp
-    dependsOn: Deploy
-    jobs:
       - job: DeployToApp
         displayName: 'Deploy Application'
+        dependsOn: SetVariables
         steps:
           - template: /templates/basic-webapp-deploy-pipeline.yaml@PipelineCommon
             parameters:
@@ -100,7 +74,7 @@ stages:
               appProject: PTS
               sqlProject: TRS
               appType: 'functionApp'
-              appInstanceNumber: $(nc-region-id)08
+              appInstanceNumber: $(nc-region-id)04
               buildProjects: |
                 **/*Functions.csproj
                 **/*Tests.csproj
