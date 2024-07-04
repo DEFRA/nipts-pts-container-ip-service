@@ -1,14 +1,14 @@
-name: "V1-B$(Date:yyyyMMdd)-$(BuildID)"
+name: 'V1-B$(Date:yyyyMMdd)-$(BuildID)'
 
 parameters:
   - name: forceDevDeploy
-    displayName: "Force deployment to DEV"
+    displayName: "Deploy to DEV?"
     type: boolean
     default: false
   - name: deployToSecondary
     displayName: "Select Secondary Region"
     type: string
-    default: PRD
+    default: None
     values:
       - None
       - DEV
@@ -33,43 +33,23 @@ resources:
       type: git
       ref: master
 
-jobs:
-  - job: DotNetRestore
-    displayName: 'DotNet Restore'
-    pool:
-      vmImage: 'ubuntu-latest'
-    steps:
-      - task: UseDotNet@2
-        inputs:
-          packageType: 'sdk'
-          version: '6.x.x' # Specify the .NET SDK version you need
-          installationPath: $(Agent.ToolsDirectory)/dotnet
+variables:
+  APIName: Defra.PTS.ContainerIpService.Functions
 
-      - task: DotNetCoreCLI@2
-        inputs:
-          command: 'restore'
-          projects: 'src/Defra.PTS.ContainerIpService.Functions/**/*.csproj' # Adjust the search pattern if necessary
-
-  - job: DeployToApp
-    displayName: 'Deploy Application'
-    dependsOn: DotNetRestore
-    pool:
-      vmImage: 'ubuntu-latest'
-    steps:
-      - template: /templates/basic-webapp-deploy-pipeline.yaml@PipelineCommon
-        parameters:
-          forceDevDeploy: ${{ parameters.forceDevDeploy }}
-          deployToSecondary: ${{ parameters.deployToSecondary }}
-          appName: Defra.PTS.ContainerIpService.Functions
-          appProject: PTS
-          scr: GH
-          appType: 'functionApp'
-          appInstanceNumber: $(nc-region-id)08
-          buildProjects: |
-            src/Defra.PTS.ContainerIpService.Functions/**/*.csproj
-            test/**/*.csproj
-          publishProject: 'src/Defra.PTS.ContainerIpService.Functions/**/*.csproj'
-          setupMiUser: 'false'    
-          skipBuildTests: false
-          runIntegrationTests: false
-          runSonarScan: false
+extends:
+  template: /templates/basic-webapp-deploy-pipeline.yaml@PipelineCommon
+  parameters:
+    forceDevDeploy: ${{ parameters.forceDevDeploy }}
+    deployToSecondary: ${{ parameters.deployToSecondary}}
+    appName: $(APIName)
+    appProject: PTS
+    appType: 'functionApp'
+    appInstanceNumber: $(nc-region-id)08
+    buildProjects: |
+      **/*Functions.csproj
+      **/*Tests.csproj
+    publishProject: '**/*Functions.csproj'
+    setupMiUser: 'false'    
+    skipBuildTests: false
+    runIntegrationTests: false
+    runSonarScan: false
