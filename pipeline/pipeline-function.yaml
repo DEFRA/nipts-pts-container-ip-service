@@ -45,7 +45,7 @@ extends:
     appProject: PTS
     scr: GH
     appType: 'functionApp'
-    appInstanceNumber: $(nc-region-id)09
+    appInstanceNumber: $(nc-region-id)10
     buildProjects: |
       **/*Functions.csproj
       **/*Tests.csproj
