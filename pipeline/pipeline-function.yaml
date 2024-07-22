@@ -24,7 +24,6 @@ trigger:
   paths:
     include:
      - src/*
-     - test/*
 
 resources:
   repositories:
@@ -48,7 +47,6 @@ extends:
     appInstanceNumber: $(nc-region-id)05
     buildProjects: |
       **/*Functions.csproj
-      **/*Tests.csproj
     publishProject: '**/*Functions.csproj'
     setupMiUser: 'false'    
     skipBuildTests: false
