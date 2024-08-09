@@ -30,8 +30,8 @@ resources:
     - repository: PipelineCommon
       name: DEFRA-TRD/Defra.TRD.Pipeline.Common
       type: git
-      ref: master
-
+      #ref: master
+      ref: AJ/sync
 variables:
   APIName: DEFRA_nipts-pts-container-ip-service
 
