@@ -52,3 +52,5 @@ extends:
     skipBuildTests: false
     runIntegrationTests: false
     runSonarScan: false
+    runSnykScan: true
+    
