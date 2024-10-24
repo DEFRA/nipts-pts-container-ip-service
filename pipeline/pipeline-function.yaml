@@ -48,7 +48,18 @@ extends:
     buildProjects: |
       **/*Functions.csproj
     publishProject: '**/*Functions.csproj'
-    setupMiUser: 'false'    
+    setupMiUser: 'false'
+    appSettingsEnv:
+      dev: >-
+        -FUNCTIONS_INPROC_NET8_ENABLED "1"
+      snd: >-
+        -FUNCTIONS_INPROC_NET8_ENABLED "1"
+      tst: >-
+        -FUNCTIONS_INPROC_NET8_ENABLED "1"
+      pre: >-
+        -FUNCTIONS_INPROC_NET8_ENABLED "1"
+      prd: >-
+        -FUNCTIONS_INPROC_NET8_ENABLED "1"
     skipBuildTests: false
     runIntegrationTests: false
     runSonarScan: false
