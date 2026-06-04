@@ -1,61 +1,58 @@
 using System;
-using System.Threading.Tasks;
-using Microsoft.AspNetCore.Mvc;
-using Microsoft.Azure.WebJobs;
-using Microsoft.Azure.WebJobs.Extensions.Http;
-using Microsoft.AspNetCore.Http;
-using Microsoft.Extensions.Logging;
-using Microsoft.Azure.KeyVault;
-using Microsoft.Azure.Services.AppAuthentication;
-using Microsoft.Azure.Management.Fluent;
-using Microsoft.Azure.Management.ResourceManager.Fluent;
-using Microsoft.Azure.Management.ResourceManager.Fluent.Authentication;
-using System.Net;
 using System.Diagnostics.CodeAnalysis;
+using System.Threading.Tasks;
+using Azure.Identity;
+using Azure.ResourceManager;
+using Azure.ResourceManager.ContainerInstance;
+using Azure.Security.KeyVault.Secrets;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.Azure.Functions.Worker;
+using Microsoft.Extensions.Logging;
 
-namespace Defra.PTS.ContainerIpService
+namespace Defra.PTS.ContainerIpService;
+
+[ExcludeFromCodeCoverage]
+public class GetContainerIPAddress
 {
-    [ExcludeFromCodeCoverage]
-    public static class GetContainerIPAddress
+    private readonly ILogger<GetContainerIPAddress> _logger;
+
+    public GetContainerIPAddress(ILogger<GetContainerIPAddress> logger)
     {
-        [FunctionName("GetContainerIPAddress")]
-        public static async Task<IActionResult> Run(
-            [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "getContainerIPAddress")] HttpRequest req,
-            ILogger log)
-        {
-            log.LogInformation("Start getting ip address");
+        _logger = logger;
+    }
 
-            var keyVaultName = Environment.GetEnvironmentVariable("keyVaultName");
-            var azureTenantId = Environment.GetEnvironmentVariable("AzureTenantId");
-            var containerName = Environment.GetEnvironmentVariable("ContainerName");
-            var resourceGroup = Environment.GetEnvironmentVariable("ContainerResourceGroupName");
-            var subscriptionId = Environment.GetEnvironmentVariable("Subscription");
+    [Function("GetContainerIPAddress")]
+    public async Task<IActionResult> Run(
+        [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "getContainerIPAddress")] HttpRequest req)
+    {
+        _logger.LogInformation("Start getting ip address");
 
-            var azureServiceTokenProvider = new AzureServiceTokenProvider();
-            var keyVaultClient = new KeyVaultClient(new KeyVaultClient.AuthenticationCallback(azureServiceTokenProvider.KeyVaultTokenCallback));
+        var keyVaultName = Environment.GetEnvironmentVariable("keyVaultName");
+        var azureTenantId = Environment.GetEnvironmentVariable("AzureTenantId");
+        var containerName = Environment.GetEnvironmentVariable("ContainerName");
+        var resourceGroup = Environment.GetEnvironmentVariable("ContainerResourceGroupName");
+        var subscriptionId = Environment.GetEnvironmentVariable("Subscription");
 
-            var azureApplicationId = (await keyVaultClient.GetSecretAsync($"https://{keyVaultName}.vault.azure.net/secrets/AdoSpClientId")).Value;
-            var azurePassword = (await keyVaultClient.GetSecretAsync($"https://{keyVaultName}.vault.azure.net/secrets/AdoSpClientSecret")).Value;
+        var defaultCredential = new DefaultAzureCredential();
 
-            var securePassword = new NetworkCredential("", azurePassword).SecurePassword;
-            var credentials = new AzureCredentials(
-                new ServicePrincipalLoginInformation
-                {
-                    ClientId = azureApplicationId,
-                    ClientSecret = azurePassword
-                },
-                azureTenantId,
-                AzureEnvironment.AzureGlobalCloud);
+        var secretClient = new SecretClient(
+            new Uri($"https://{keyVaultName}.vault.azure.net/"),
+            defaultCredential);
 
-            var azure = Azure
-                .Authenticate(credentials)
-                .WithSubscription(subscriptionId);
+        var azureApplicationId = (await secretClient.GetSecretAsync("AdoSpClientId")).Value.Value;
+        var azurePassword = (await secretClient.GetSecretAsync("AdoSpClientSecret")).Value.Value;
 
-            var containerGroup = await azure.ContainerGroups.GetByResourceGroupAsync(resourceGroup, containerName);
-            var ipAddress = containerGroup.IPAddress;
+        var spCredential = new ClientSecretCredential(azureTenantId, azureApplicationId, azurePassword);
 
-            log.LogInformation("End getting ip address");
-            return new OkObjectResult(ipAddress);
-        }
+        var armClient = new ArmClient(spCredential, subscriptionId);
+        var subscription = await armClient.GetDefaultSubscriptionAsync();
+        var resourceGroupResource = await subscription.GetResourceGroupAsync(resourceGroup);
+        var containerGroup = await resourceGroupResource.Value.GetContainerGroups().GetAsync(containerName);
+
+        var ipAddress = containerGroup.Value.Data.IPAddress?.IP?.ToString();
+
+        _logger.LogInformation("End getting ip address");
+        return new OkObjectResult(ipAddress);
     }
 }
