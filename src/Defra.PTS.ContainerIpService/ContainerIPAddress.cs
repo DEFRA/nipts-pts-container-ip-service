@@ -1,29 +1,32 @@
 using System;
 using System.Threading.Tasks;
-using Microsoft.AspNetCore.Mvc;
-using Microsoft.Azure.WebJobs;
-using Microsoft.Azure.WebJobs.Extensions.Http;
-using Microsoft.AspNetCore.Http;
-using Microsoft.Extensions.Logging;
-using Microsoft.Azure.KeyVault;
-using Microsoft.Azure.Services.AppAuthentication;
-using Microsoft.Azure.Management.Fluent;
-using Microsoft.Azure.Management.ResourceManager.Fluent;
-using Microsoft.Azure.Management.ResourceManager.Fluent.Authentication;
-using System.Net;
 using System.Diagnostics.CodeAnalysis;
+using Azure.Identity;
+using Azure.ResourceManager;
+using Azure.ResourceManager.ContainerInstance;
+using Azure.Security.KeyVault.Secrets;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.Azure.Functions.Worker;
+using Microsoft.Extensions.Logging;
 
 namespace Defra.PTS.ContainerIpService
 {
     [ExcludeFromCodeCoverage]
-    public static class GetContainerIPAddress
+    public class GetContainerIPAddress
     {
-        [FunctionName("GetContainerIPAddress")]
-        public static async Task<IActionResult> Run(
-            [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "getContainerIPAddress")] HttpRequest req,
-            ILogger log)
+        private readonly ILogger<GetContainerIPAddress> _logger;
+
+        public GetContainerIPAddress(ILogger<GetContainerIPAddress> logger)
         {
-            log.LogInformation("Start getting ip address");
+            _logger = logger;
+        }
+
+        [Function("GetContainerIPAddress")]
+        public async Task<IActionResult> Run(
+            [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "getContainerIPAddress")] HttpRequest req)
+        {
+            _logger.LogInformation("Start getting ip address");
 
             var keyVaultName = Environment.GetEnvironmentVariable("keyVaultName");
             var azureTenantId = Environment.GetEnvironmentVariable("AzureTenantId");
@@ -31,30 +34,18 @@ namespace Defra.PTS.ContainerIpService
             var resourceGroup = Environment.GetEnvironmentVariable("ContainerResourceGroupName");
             var subscriptionId = Environment.GetEnvironmentVariable("Subscription");
 
-            var azureServiceTokenProvider = new AzureServiceTokenProvider();
-            var keyVaultClient = new KeyVaultClient(new KeyVaultClient.AuthenticationCallback(azureServiceTokenProvider.KeyVaultTokenCallback));
+            var secretClient = new SecretClient(new Uri($"https://{keyVaultName}.vault.azure.net/"), new DefaultAzureCredential());
+            var azureApplicationId = (await secretClient.GetSecretAsync("AdoSpClientId")).Value.Value;
+            var azurePassword = (await secretClient.GetSecretAsync("AdoSpClientSecret")).Value.Value;
 
-            var azureApplicationId = (await keyVaultClient.GetSecretAsync($"https://{keyVaultName}.vault.azure.net/secrets/AdoSpClientId")).Value;
-            var azurePassword = (await keyVaultClient.GetSecretAsync($"https://{keyVaultName}.vault.azure.net/secrets/AdoSpClientSecret")).Value;
+            var credentials = new ClientSecretCredential(azureTenantId, azureApplicationId, azurePassword);
+            var armClient = new ArmClient(credentials, subscriptionId);
 
-            var securePassword = new NetworkCredential("", azurePassword).SecurePassword;
-            var credentials = new AzureCredentials(
-                new ServicePrincipalLoginInformation
-                {
-                    ClientId = azureApplicationId,
-                    ClientSecret = azurePassword
-                },
-                azureTenantId,
-                AzureEnvironment.AzureGlobalCloud);
+            var containerGroupId = ContainerGroupResource.CreateResourceIdentifier(subscriptionId, resourceGroup, containerName);
+            var containerGroup = await armClient.GetContainerGroupResource(containerGroupId).GetAsync();
+            var ipAddress = containerGroup.Value.Data.IPAddress?.IP?.ToString();
 
-            var azure = Azure
-                .Authenticate(credentials)
-                .WithSubscription(subscriptionId);
-
-            var containerGroup = await azure.ContainerGroups.GetByResourceGroupAsync(resourceGroup, containerName);
-            var ipAddress = containerGroup.IPAddress;
-
-            log.LogInformation("End getting ip address");
+            _logger.LogInformation("End getting ip address");
             return new OkObjectResult(ipAddress);
         }
     }
