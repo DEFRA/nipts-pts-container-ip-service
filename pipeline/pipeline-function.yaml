@@ -51,15 +51,15 @@ extends:
     setupMiUser: 'false'
     appSettingsEnv:
       dev: >-
-        -FUNCTIONS_INPROC_NET8_ENABLED "1"
+        -FUNCTIONS_WORKER_RUNTIME "dotnet-isolated"
       snd: >-
-        -FUNCTIONS_INPROC_NET8_ENABLED "1"
+        -FUNCTIONS_WORKER_RUNTIME "dotnet-isolated"
       tst: >-
-        -FUNCTIONS_INPROC_NET8_ENABLED "1"
+        -FUNCTIONS_WORKER_RUNTIME "dotnet-isolated"
       pre: >-
-        -FUNCTIONS_INPROC_NET8_ENABLED "1"
+        -FUNCTIONS_WORKER_RUNTIME "dotnet-isolated"
       prd: >-
-        -FUNCTIONS_INPROC_NET8_ENABLED "1"
+        -FUNCTIONS_WORKER_RUNTIME "dotnet-isolated"
     skipBuildTests: false
     runIntegrationTests: false
     runSonarScan: false
